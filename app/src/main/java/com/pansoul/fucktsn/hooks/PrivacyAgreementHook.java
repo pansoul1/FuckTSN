@@ -1,12 +1,12 @@
 package com.pansoul.fucktsn.hooks;
 
-import android.content.SharedPreferences;
-
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class PrivacyAgreementHook extends BaseHook {
+
+    private boolean hasSetAgreement = false;
 
     public PrivacyAgreementHook() {
         super("隐私协议自动同意");
@@ -14,17 +14,21 @@ public class PrivacyAgreementHook extends BaseHook {
 
     @Override
     protected void hook(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-        hookSharedPreferences(lpparam);
+        // Hook SharedPreferences读取（不受360加固影响）
+        hookSharedPreferencesRead(lpparam);
+        
+        // Hook ClassLoader等待LoginUser加载后设置标记
+        hookClassLoaderForDelayedSet(lpparam);
     }
 
     /**
-     * Hook SharedPreferences实现类，当读取"agreement"键时返回true
+     * Hook SharedPreferences读取agreement键，直接返回true
+     * SharedPreferences是Android系统类，不受360加固影响
      */
-    private void hookSharedPreferences(XC_LoadPackage.LoadPackageParam lpparam) {
+    private void hookSharedPreferencesRead(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            log("正在Hook SharedPreferencesImpl - 隐私协议状态");
+            log("正在Hook SharedPreferencesImpl.getBoolean() - 协议读取");
             
-          
             Class<?> sharedPrefsImpl = XposedHelpers.findClass(
                     "android.app.SharedPreferencesImpl",
                     lpparam.classLoader
@@ -40,60 +44,62 @@ public class PrivacyAgreementHook extends BaseHook {
                         protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                             String key = (String) param.args[0];
                             if ("agreement".equals(key)) {
-                                log("[拦截] SharedPreferencesImpl.getBoolean(\"agreement\") -> 返回true");
                                 param.setResult(true);
+                                log("[拦截] SharedPreferences读取agreement -> 返回true");
                             }
                         }
                     }
             );
             
-            log("SharedPreferencesImpl Hook完成");
+            log("SharedPreferences Hook完成");
         } catch (Throwable t) {
-            log("[警告] Hook SharedPreferencesImpl失败: " + t.getMessage());
+            log("[错误] Hook SharedPreferences失败: " + t.getMessage());
         }
-        
-     
+    }
+
+    /**
+     * Hook ClassLoader.loadClass()，等待LoginUser被加载后设置标记
+     * 这样可以绕过360加固的延迟加载
+     */
+    private void hookClassLoaderForDelayedSet(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            log("正在Hook Activity.onCreate() - 自动点击同意按钮");
+            log("正在Hook ClassLoader.loadClass() - 等待LoginUser加载");
             
             XposedHelpers.findAndHookMethod(
-                    android.app.Activity.class,
-                    "onCreate",
-                    android.os.Bundle.class,
+                    ClassLoader.class,
+                    "loadClass",
+                    String.class,
                     new XC_MethodHook() {
                         @Override
                         protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                            android.app.Activity activity = (android.app.Activity) param.thisObject;
-                            String className = activity.getClass().getName();
+                            if (hasSetAgreement) {
+                                return;
+                            }
                             
-                   
-                            if (className.contains("PrivacyAgreement") || className.contains("Privacy") || className.contains("Agreement")) {
-                                log("[检测] 可能的隐私协议界面: " + className);
+                            String className = (String) param.args[0];
+                            
+                            // 当LoginUser类被加载时
+                            if ("com.bxkj.base.user.LoginUser".equals(className)) {
+                                Class<?> loginUserClass = (Class<?>) param.getResult();
                                 
-                          
-                                activity.getWindow().getDecorView().postDelayed(new Runnable() {
+                                // 延迟500ms等待类完全初始化
+                                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
                                     @Override
                                     public void run() {
                                         try {
-                                        
-                                            int agreeId = activity.getResources().getIdentifier("bt_agree", "id", activity.getPackageName());
-                                            if (agreeId != 0) {
-                                                android.view.View agreeBtn = activity.findViewById(agreeId);
-                                                if (agreeBtn != null) {
-                                                    agreeBtn.performClick();
-                                                    log("[成功] 已自动点击同意按钮");
-                                                    return;
-                                                }
-                                            }
+                                            // 获取LoginUser单例
+                                            Object loginUser = XposedHelpers.callStaticMethod(
+                                                    loginUserClass,
+                                                    "getLoginUser"
+                                            );
                                             
-                                     
-                                            try {
-                                                XposedHelpers.callMethod(activity, "M");
-                                                log("[成功] 已调用M()方法自动同意");
-                                            } catch (Throwable ignored) {
-                                            }
+                                            // 设置协议标记
+                                            XposedHelpers.callMethod(loginUser, "setAgreement", true);
+                                            
+                                            hasSetAgreement = true;
+                                            log("[成功] LoginUser已加载，协议标记已设置为true");
                                         } catch (Throwable t) {
-                                            log("[提示] 自动点击失败: " + t.getMessage());
+                                            log("[警告] 延迟设置标记失败: " + t.getMessage());
                                         }
                                     }
                                 }, 500);
@@ -102,10 +108,9 @@ public class PrivacyAgreementHook extends BaseHook {
                     }
             );
             
-            log("Activity.onCreate() Hook完成");
+            log("ClassLoader Hook完成");
         } catch (Throwable t) {
-            log("[错误] Hook Activity失败: " + t.getMessage());
+            log("[错误] Hook ClassLoader失败: " + t.getMessage());
         }
     }
 }
-

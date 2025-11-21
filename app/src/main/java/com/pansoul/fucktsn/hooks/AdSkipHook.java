@@ -33,17 +33,23 @@ public class AdSkipHook extends BaseHook {
                     new XC_MethodHook() {
                         @Override
                         protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                            Activity activity = (Activity) param.thisObject;
+                            final Activity activity = (Activity) param.thisObject;
                             String className = activity.getClass().getName();
                             
                           
                             if (className.contains("Splash") || className.contains("Welcome")) {
                                 log("[检测] 启动页广告界面: " + className);
                                 
-                             
+                                // 修复内存泄漏：检查Activity生命周期
                                 activity.getWindow().getDecorView().postDelayed(new Runnable() {
                                     @Override
                                     public void run() {
+                                        // 防止Activity已销毁时执行
+                                        if (activity.isDestroyed() || activity.isFinishing()) {
+                                            log("[跳过] Activity已销毁，取消跳过操作");
+                                            return;
+                                        }
+                                        
                                         try {
                                           
                                             XposedHelpers.callMethod(param.thisObject, "S");
@@ -100,20 +106,17 @@ public class AdSkipHook extends BaseHook {
                             
                             if (isFromSplash) {
                                 log("[拦截] 启动页倒计时开始 -> 立即触发完成");
-                               
-                                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        try {
-                                            CountDownTimer timer = (CountDownTimer) param.thisObject;
-                                            timer.onFinish();
-                                            timer.cancel();
-                                            log("[成功] 倒计时已立即完成");
-                                        } catch (Throwable t) {
-                                            log("[提示] 触发倒计时完成失败: " + t.getMessage());
-                                        }
-                                    }
-                                }, 100);
+                                
+                                // 修复内存泄漏：直接执行，避免延迟导致的引用持有
+                                try {
+                                    CountDownTimer timer = (CountDownTimer) param.thisObject;
+                                    // 先取消，再触发完成
+                                    timer.cancel();
+                                    timer.onFinish();
+                                    log("[成功] 倒计时已立即完成");
+                                } catch (Throwable t) {
+                                    log("[提示] 触发倒计时完成失败: " + t.getMessage());
+                                }
                             }
                         }
                     }

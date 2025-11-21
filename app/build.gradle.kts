@@ -10,15 +10,16 @@ android {
         applicationId = "com.pansoul.fucktsn"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20017
-        versionName = "2.0.17"
+        versionCode = 200175
+        versionName = "2.0.17-Bate"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

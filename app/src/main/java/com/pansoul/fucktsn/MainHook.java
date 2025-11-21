@@ -2,10 +2,15 @@ package com.pansoul.fucktsn;
 
 import com.pansoul.fucktsn.hooks.BaseHook;
 import com.pansoul.fucktsn.hooks.UniversalHook;
+import com.pansoul.fucktsn.hooks.RootDetectionHook;
 import com.pansoul.fucktsn.hooks.PrivacyAgreementHook;
 import com.pansoul.fucktsn.hooks.AdSkipHook;
 import com.pansoul.fucktsn.hooks.DialogBlockHook;
 import com.pansoul.fucktsn.hooks.SportsDescriptionHook;
+import com.pansoul.fucktsn.hooks.DeviceIdDisplayHook;
+import com.pansoul.fucktsn.hooks.DeviceIdRandomizerHook;
+import com.pansoul.fucktsn.hooks.DeviceModelRandomizerHook;
+import com.pansoul.fucktsn.hooks.AccountQuickSelectHook;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +31,9 @@ public class MainHook implements IXposedHookLoadPackage {
        
         hooks.add(new UniversalHook());
         
+        // 增强的Root和安全检测绕过（针对应用本体检测类）
+        hooks.add(new RootDetectionHook());
+        
         hooks.add(new PrivacyAgreementHook());
         
         hooks.add(new AdSkipHook());
@@ -33,6 +41,15 @@ public class MainHook implements IXposedHookLoadPackage {
         hooks.add(new DialogBlockHook());
         
         hooks.add(new SportsDescriptionHook());
+        
+        hooks.add(new DeviceIdRandomizerHook());
+        
+        hooks.add(new DeviceModelRandomizerHook());
+        
+        hooks.add(new DeviceIdDisplayHook());
+        
+        // 账号快速选择
+        hooks.add(new AccountQuickSelectHook());
     }
 
     @Override

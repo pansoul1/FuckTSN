@@ -10,6 +10,9 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class UniversalHook extends BaseHook {
 
+    // 缓存Root检测关键词，避免重复创建
+    private static final String[] ROOT_KEYWORDS = {"/su", "magisk", "superuser.apk", "frida-server"};
+
     public UniversalHook() {
         super("通用检测绕过");
     }
@@ -59,13 +62,21 @@ public class UniversalHook extends BaseHook {
                             File file = (File) param.thisObject;
                             String path = file.getAbsolutePath();
                             
-              
-                            if (path.contains("/su") || 
-                                path.contains("magisk") ||
-                                path.contains("Superuser.apk") ||
-                                path.contains("frida-server")) {
-                                log("[拦截] Root文件检测: " + path + " -> 返回false");
-                                param.setResult(false);
+                            // 性能优化：快速跳过明显安全的路径
+                            if (path.startsWith("/data/user/") || 
+                                path.startsWith("/storage/emulated/") ||
+                                path.startsWith("/data/data/")) {
+                                return;
+                            }
+                            
+                            // 性能优化：统一转小写后检测，避免多次字符串操作
+                            String lowerPath = path.toLowerCase();
+                            for (String keyword : ROOT_KEYWORDS) {
+                                if (lowerPath.contains(keyword)) {
+                                    log("[拦截] Root文件检测: " + path + " -> 返回false");
+                                    param.setResult(false);
+                                    return;
+                                }
                             }
                         }
                     }

@@ -1,10 +1,6 @@
 package com.pansoul.fucktsn.hooks;
 
 import android.app.Activity;
-import android.os.Handler;
-import android.view.View;
-import android.widget.Button;
-import android.widget.CheckBox;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedHelpers;
@@ -13,25 +9,24 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 public class SportsDescriptionHook extends BaseHook {
 
     public SportsDescriptionHook() {
-        super("锻炼说明自动跳过");
+        super("运动启动流程自动跳过");
     }
 
     @Override
     protected void hook(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
         hookSportsDescriptionActivity(lpparam);
+        hookV4SportActivity(lpparam);
     }
 
     /**
-     * Hook 锻炼说明页面，自动跳过倒计时（适配360加固）
+     * Hook 锻炼说明页面，直接调用完成方法（适配360加固）
      */
     private void hookSportsDescriptionActivity(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
-            log("正在Hook Activity.onCreate - 检测锻炼说明页面（适配360加固）");
+            log("正在Hook Activity.onCreate - 检测锻炼说明页面");
             
-  
             XposedHelpers.findAndHookMethod(
-                "android.app.Activity",
-                lpparam.classLoader,
+                Activity.class,
                 "onCreate",
                 android.os.Bundle.class,
                 new XC_MethodHook() {
@@ -40,122 +35,104 @@ public class SportsDescriptionHook extends BaseHook {
                         final Activity activity = (Activity) param.thisObject;
                         String className = activity.getClass().getName();
                         
-      
                         if (className.contains("SportsDescriptionActivity")) {
                             log("[检测] 发现锻炼说明页面: " + className);
                             
-                            
-                            new Handler(activity.getMainLooper()).postDelayed(new Runnable() {
+                            // 直接调用完成方法，不模拟UI操作
+                            activity.getWindow().getDecorView().post(new Runnable() {
                                 @Override
                                 public void run() {
                                     try {
-                                        autoSkipSportsDescription(activity);
+                                        // 先设置"不再提示"配置为true
+                                        try {
+                                            Class<?> dataClass = XposedHelpers.findClass(
+                                                "com.bxkj.base.v2.data.a",
+                                                lpparam.classLoader
+                                            );
+                                            Object dataInstance = XposedHelpers.getStaticObjectField(dataClass, "f16779d");
+                                            Object configInstance = XposedHelpers.callMethod(dataInstance, "a");
+                                            XposedHelpers.callMethod(configInstance, "C0", true);
+                                            log("[成功] 已设置'不再提示'配置");
+                                        } catch (Throwable t) {
+                                            log("[警告] 设置配置失败，但继续执行: " + t.getMessage());
+                                        }
+                                        
+                                        // 直接调用M()方法（原本是点击按钮后调用的）
+                                        XposedHelpers.callMethod(activity, "M");
+                                        log("[成功] 已直接调用M()方法，跳过说明页");
                                     } catch (Throwable t) {
-                                        log("[错误] 自动跳过失败: " + t.getMessage());
+                                        log("[错误] 调用M()失败: " + t.getMessage());
                                     }
                                 }
-                            }, 1000);
+                            });
                         }
                     }
                 }
             );
             
-            log("Activity.onCreate Hook完成（等待锻炼说明页面）");
+            log("锻炼说明页面Hook完成");
         } catch (Throwable t) {
-            log("[错误] Hook Activity失败: " + t.getMessage());
+            log("[错误] Hook锻炼说明页面失败: " + t.getMessage());
             t.printStackTrace();
         }
     }
     
     /**
-     * 自动跳过锻炼说明
+     * Hook V4SportActivity，阻止启动3-2-1倒计时，直接开始运动
      */
-    private void autoSkipSportsDescription(Activity activity) {
+    private void hookV4SportActivity(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
+            log("正在Hook Activity.onCreate - 检测V4SportActivity");
             
-            View decorView = activity.getWindow().getDecorView();
-        
-            int checkBoxId = activity.getResources().getIdentifier("cb_ignore", "id", activity.getPackageName());
-            CheckBox cbIgnore = null;
-            if (checkBoxId != 0) {
-                cbIgnore = decorView.findViewById(checkBoxId);
-            }
+            XposedHelpers.findAndHookMethod(
+                Activity.class,
+                "onCreate",
+                android.os.Bundle.class,
+                new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(final MethodHookParam param) throws Throwable {
+                        Activity activity = (Activity) param.thisObject;
+                        String className = activity.getClass().getName();
+                        
+                        if (className.contains("V4SportActivity")) {
+                            log("[检测] 发现V4SportActivity: " + className);
+                            
+                            // Hook b0()方法，阻止启动ThreeTwoOne，改为直接调用O()
+                            try {
+                                XposedHelpers.findAndHookMethod(
+                                    activity.getClass(),
+                                    "b0",
+                                    new XC_MethodHook() {
+                                        @Override
+                                        protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                                            // 阻止原方法执行（不启动ThreeTwoOne）
+                                            param.setResult(null);
+                                            log("[拦截] 已阻止启动3-2-1倒计时页面");
+                                            
+                                            // 直接调用O()开始运动
+                                            try {
+                                                XposedHelpers.callMethod(param.thisObject, "O");
+                                                log("[成功] 已直接调用O()方法开始运动");
+                                            } catch (Throwable t) {
+                                                log("[错误] 调用O()失败: " + t.getMessage());
+                                            }
+                                        }
+                                    }
+                                );
+                                log("[成功] 已Hook V4SportActivity.b0()方法");
+                            } catch (Throwable t) {
+                                log("[错误] Hook b0()方法失败: " + t.getMessage());
+                            }
+                        }
+                    }
+                }
+            );
             
- 
-            int buttonId = activity.getResources().getIdentifier("bt_start", "id", activity.getPackageName());
-            Button btStart = null;
-            if (buttonId != 0) {
-                btStart = decorView.findViewById(buttonId);
-            }
-            
-
-            if (btStart == null) {
-                btStart = findButtonByText(decorView, "开始锻炼");
-            }
-            if (cbIgnore == null) {
-                cbIgnore = findCheckBoxNearButton(decorView, btStart);
-            }
-            
-         
-            if (cbIgnore != null && !cbIgnore.isChecked()) {
-                cbIgnore.setChecked(true);
-                log("[锻炼说明] 已自动勾选'不再提醒'");
-            }
-            
- 
-            if (btStart != null) {
-                btStart.setEnabled(true);
-                btStart.setText("开始锻炼");
-                btStart.performClick();
-                log("[锻炼说明] 已自动点击'开始锻炼'按钮");
-            } else {
-                log("[警告] 未找到'开始锻炼'按钮");
-            }
-            
+            log("V4SportActivity Hook完成");
         } catch (Throwable t) {
-            log("[错误] 处理锻炼说明失败: " + t.getMessage());
+            log("[错误] Hook V4SportActivity失败: " + t.getMessage());
+            t.printStackTrace();
         }
-    }
-    
-    /**
-     * 通过文本查找按钮
-     */
-    private Button findButtonByText(View view, String text) {
-        if (view instanceof Button) {
-            Button button = (Button) view;
-            CharSequence buttonText = button.getText();
-            if (buttonText != null && buttonText.toString().contains(text)) {
-                return button;
-            }
-        }
-        
-        if (view instanceof android.view.ViewGroup) {
-            android.view.ViewGroup group = (android.view.ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                Button result = findButtonByText(group.getChildAt(i), text);
-                if (result != null) {
-                    return result;
-                }
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
-     * 查找按钮附近的复选框
-     */
-    private CheckBox findCheckBoxNearButton(View root, Button button) {
-        if (root instanceof android.view.ViewGroup) {
-            android.view.ViewGroup group = (android.view.ViewGroup) root;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                View child = group.getChildAt(i);
-                if (child instanceof CheckBox) {
-                    return (CheckBox) child;
-                }
-            }
-        }
-        return null;
     }
 }
 

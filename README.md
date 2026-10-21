@@ -16,7 +16,7 @@
 
 - Android 10+ (API 29+)
 - LSPosed 或其他 Xposed 框架
-- 目标应用：**体适能 2.0.15 - 2.0.18**
+- 目标应用：**体适能 2.0.15 - 2.0.25**
 
 ### 安装步骤
 
@@ -25,6 +25,12 @@
 3. 在 LSPosed 中激活模块
 4. 勾选目标应用：**体适能**
 5. 重启体适能应用
+
+### 2.0.25 注意事项
+
+- 2.0.25 使用 SecShell 加固，启动前请确认 `/data/local/tmp/frida-server` 不存在；该文件会被 `rp1.a()` 判定为 Hook。
+- 如果体适能在 Magisk DenyList 中，需要先移出 DenyList，LSPosed 才能注入。
+- 2.0.25 的安全类被 R8 重命名到默认包（`ce/cj4/tz0/rp1/b15/yj0`），模块通过精确类名和 `ClassLoader` 监听完成 Hook；详细映射见 [docs/2.0.25-adaptation.md](docs/2.0.25-adaptation.md)。
 
 ## 🚀 使用说明
 
@@ -53,6 +59,15 @@
 - 使用本模块产生的任何后果由使用者自行承担
 
 ## 📝 更新日志
+
+### v2.0.25 (2026-10-21)
+
+- 🎯 **适配体适能 2.0.25** - 适配 SecShell 加固后的新版本
+- 🧩 **新增安全类映射** - `ce/cj4/tz0/rp1/b15/yj0`（R8 重命名后的默认包类）
+- 🔏 **绕过原生签名校验** - Hook `a12.c(Context)` 与 `Transform.d(Context)`
+- 🛡️ **启动兜底** - 在 `App.onCreate()` 前主动加载并 Hook 安全类，兼容 InMemoryDex
+- 🚪 **退出保护** - 可选拦截 `System.exit/Runtime.exit/halt/Process.killProcess`
+- 📄 **新增适配文档** - `docs/2.0.25-adaptation.md`
 
 ### v2.0.18 (2025-12-23)
 

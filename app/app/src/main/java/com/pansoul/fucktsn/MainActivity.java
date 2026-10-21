@@ -116,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         
         TextView subtitle = new TextView(this);
-        subtitle.setText("Version 2.0.18");
+        subtitle.setText("Version 2.0.25 (for TSN 2.0.25)");
         subtitle.setTextSize(14);
         subtitle.setTextColor(COLOR_TEXT_TERTIARY);
 
